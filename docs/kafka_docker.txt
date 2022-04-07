@@ -1,0 +1,89 @@
+SOURCE:
+1) https://habr.com/ru/post/543732/
+2) https://www.youtube.com/watch?v=PtFTGQG2LwA
+
+// создаем сеть
+docker network create kafkanet
+> deac2964cd55b898aac78bf7d6b61e20788f112bc9f2e537420d409acc5eb069
+
+// run zoolkeeper in docker
+docker run -d --network=kafkanet --name=zookeeper -e ZOOKEEPER_CLIENT_PORT=2181 -e ZOOKEEPER_TICK_TIME=2000 -p 2181:2181 confluentinc/cp-zookeeper
+
+// simple run kafka
+docker run -d --network=kafkanet --name=kafka -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 -p 9092:9092 confluentinc/cp-kafka
+
+// after that we can check that everything is ok with kafka
+docker logs kafka
+> [main] INFO org.apache.zookeeper.ZooKeeper - Client environment:zookeeper.version=3.6.3--6401e4ad2087061bc6b9f80dec2d69f2e3c8660a, built on 04/08/2021 16:35 GMT
+[main] INFO org.apache.zookeeper.ZooKeeper - Client environment:host.name=e378c5341c27
+[main] INFO org.apache.zookeeper.ZooKeeper - Client environment:java.version=11.0.13
+[main] INFO org.apache.zookeeper.ZooKeeper - Client environment:java.vendor=Azul Systems, Inc.
+[main] INFO org.apache.zookeeper.ZooKeeper - Client environment:java.home=/usr/lib/jvm/zulu11-ca
+...
+
+// and connect to kafka console
+docker exec -it kafka bash
+> [appuser@e378c5341c27 ~]$
+
+// create topic
+[appuser@e378c5341c27 ~]$ /bin/kafka-topics --create --topic demo-topic --bootstrap-server kafka:9092
+> Created topic demo-topic.
+
+// list topics
+[appuser@e378c5341c27 ~]$ /bin/kafka-topics --list --bootstrap-server kafka:9092
+> demo-topic
+
+// describe specified topics
+[appuser@e378c5341c27 ~]$ /bin/kafka-topics --describe --topic demo-topic --bootstrap-server kafka:9092
+Topic: demo-topic       TopicId: V8sG82wkTMqTyTqKP3Xb3A PartitionCount: 1       ReplicationFactor: 1    Configs:
+        Topic: demo-topic       Partition: 0    Leader: 1001    Replicas: 1001  Isr: 1001
+
+// send messages from console
+// NOTE по дефолту сообщения хранятся в топике 7 дней
+[appuser@e378c5341c27 ~]$ /bin/kafka-console-producer --topic demo-topic --bootstrap-server kafka:9092
+>1
+>2
+>3
+>hello
+>^C[appuser@e378c5341c27 ~]$
+
+// consume messages in kafka-console
+// NOTE: consumer/producer can be in different consoles
+// param "--from-beginning" - чтение с самого начала, 
+// не нужен в случае consumer group (e. g. "--group demo-group")
+[appuser@e378c5341c27 ~]$ /bin/kafka-console-consumer --topic demo-topic --from-beginning --bootstrap-server kafka:9092
+1
+2
+3
+hello
+^CProcessed a total of 4 messages
+
+// add partitions to topic (alter)
+// as it was with "zookeeper": [appuser@e378c5341c27 ~]$ /bin/kafka-topics --zookeeper zookeeper:2181 --alter --topic demo-topic --partitions 3
+// but now we should use "--bootstrap-server kafka:9092" instead
+// increase partitions to 3 and list topic:
+[appuser@e378c5341c27 ~]$ /bin/kafka-topics --bootstrap-server kafka:9092 --alter --topic demo-topic --partitions 3
+[appuser@e378c5341c27 ~]$ /bin/kafka-topics --describe --topic demo-topic --bootstrap-server kafka:9092
+Topic: demo-topic       TopicId: V8sG82wkTMqTyTqKP3Xb3A PartitionCount: 3       ReplicationFactor: 1    Configs:
+        Topic: demo-topic       Partition: 0    Leader: 1001    Replicas: 1001  Isr: 1001
+        Topic: demo-topic       Partition: 1    Leader: 1001    Replicas: 1001  Isr: 1001
+        Topic: demo-topic       Partition: 2    Leader: 1001    Replicas: 1001  Isr: 1001
+[appuser@e378c5341c27 ~]$
+
+// setup comsumer for group
+[appuser@e378c5341c27 ~]$ bash /bin/kafka-console-consumer --topic demo-topic --group demo-group --bootstrap-server kafka:9092
+// или сразу войти в консоль кафки
+// docker exec -it kafka bash /bin/kafka-console-consumer --topic demo-topic --group demo-group --bootstrap-server kafka:9092
+// Можно создать сколько угодно консьюмеров группы и они будут принимать сообщения топика
+// Причем каждый консьюмер - свою уникаллную часть сообщений
+// НО! количество консьюмеров должно не превышать количества партиций у топика
+// (в нашем случае 3), поскольку все лишние консьюмеры не будут получать сообщения
+
+
+
+
+
+
+
+
+

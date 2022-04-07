@@ -1,0 +1,8 @@
+== Kafka notes
+
+Source: link:https://www.youtube.com/watch?v=vRkXEbynSa0[youtube], link:https://www.youtube.com/watch?v=PtFTGQG2LwA[youtube-2], link:[habr]
+
+- Принцип "умный клиент - тупая очередь":
+1. Кафка не может отфильтровать месседж - это должен делать потребитель или Kafka Streams
+2. Кафка не поддерживает delay у сообщений.
+3. Для поддержки широковещания надо отправить сообщение по очереди в каждый топик.
